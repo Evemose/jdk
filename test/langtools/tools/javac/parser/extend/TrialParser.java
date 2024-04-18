@@ -217,9 +217,9 @@ class TrialParser extends JavacParser {
                         if (token.kind == LPAREN) {
                         // method declaration
                             //mods.flags |= Flags.STATIC;
-                            return List.of(methodDeclaratorRest(
+                            return methodDeclaratorRest(
                                     pos, mods, t, name, typarams,
-                                    false, isVoid, false, dc));
+                                    false, isVoid, false, dc);
                         } else if (!isVoid && typarams.isEmpty()) {
                         // variable declaration
                             //mods.flags |= Flags.STATIC;
