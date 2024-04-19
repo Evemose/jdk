@@ -25,6 +25,7 @@
 
 package com.sun.tools.javac.parser;
 
+import java.io.FileOutputStream;
 import java.util.*;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -3169,7 +3170,8 @@ public class JavacParser implements Parser {
         JCExpression paramType = catchTypes.size() > 1 ?
                 toP(F.at(catchTypes.head.getStartPosition()).TypeUnion(catchTypes)) :
                 catchTypes.head;
-        JCVariableDecl formal = variableDeclaratorId(mods, paramType, true, false, false);
+        JCVariableDecl formal = variableDeclaratorId(
+                mods, paramType, true, false, false);
         accept(RPAREN);
         JCBlock body = block();
         return F.at(pos).Catch(formal, body);
@@ -3831,6 +3833,14 @@ public class JavacParser implements Parser {
                 pn = qualident(false);
             }
             if (pn.hasTag(Tag.IDENT) && ((JCIdent)pn).name != names._this) {
+                try (var outputStream = new FileOutputStream("C:/Projects/java/test-jdk2/output.txt", true)) {
+                    outputStream.write(pn.toString().getBytes());
+                    outputStream.write(" name: ".getBytes());
+                    outputStream.write(String.valueOf(((JCIdent)pn).name).getBytes());
+                    outputStream.write("\n".getBytes());
+                } catch (Exception _) {
+
+                }
                 name = ((JCIdent)pn).name;
             } else if (lambdaParameter && type == null) {
                 // we have a lambda parameter that is not an identifier this is a syntax error
@@ -5195,6 +5205,11 @@ public class JavacParser implements Parser {
         // need to distinguish between vararg annos and array annos
         // look at typeAnnotationsPushedBack comment
         this.permitTypeAnnotationsPushBack = true;
+        boolean isExtensionReciever = false;
+        if (token.kind == EXTENDS) {
+            isExtensionReciever = true;
+            nextToken();
+        }
         JCExpression type = parseType(lambdaParameter);
         this.permitTypeAnnotationsPushBack = false;
 
@@ -5212,7 +5227,11 @@ public class JavacParser implements Parser {
             }
             typeAnnotationsPushedBack = List.nil();
         }
-        return variableDeclaratorId(mods, type, false, lambdaParameter, recordComponent);
+        var varId = variableDeclaratorId(mods, type, false, lambdaParameter, recordComponent);
+        if (isExtensionReciever) {
+            varId.nameexpr = F.Ident(varId.name);
+        }
+        return varId;
     }
 
     protected JCVariableDecl implicitParameter() {

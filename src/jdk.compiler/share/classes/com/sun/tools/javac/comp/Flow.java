@@ -27,6 +27,9 @@
 
 package com.sun.tools.javac.comp;
 
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.PrintWriter;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.HashMap;
@@ -3396,7 +3399,12 @@ public class Flow {
 
         @Override
         public void visitIdent(JCIdent tree) {
-            if (tree.sym.kind == VAR) {
+            try(var outputStream = new FileOutputStream("C:/Projects/java/test-jdk-ext/internal.txt", true);
+                var writer = new PrintWriter(outputStream)) {
+                writer.println("visitIdent: " + tree);
+            } catch (IOException _) {
+            }
+            if (tree.sym != null && tree.sym.kind == VAR) {
                 checkEffectivelyFinal(tree, (VarSymbol)tree.sym);
             }
         }

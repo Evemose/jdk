@@ -54,6 +54,9 @@ import com.sun.tools.javac.util.JCDiagnostic.DiagnosticFlag;
 import com.sun.tools.javac.util.JCDiagnostic.DiagnosticPosition;
 import com.sun.tools.javac.util.JCDiagnostic.DiagnosticType;
 
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.PrintWriter;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.EnumSet;
@@ -1910,6 +1913,17 @@ public class Resolve {
                 };
             }
         }
+
+        if (bestSoFar.kind.isResolutionError()) {
+            bestSoFar = findMethodInScope(env, site, name, argtypes, typeargtypes,
+                    env.toplevel.namedImportScope, bestSoFar, allowBoxing, useVarargs, false);
+        }
+
+        try (var outputStream = new FileOutputStream("C:/Projects/java/test-jdk-ext/resolve_meth.txt", true);
+             var writer = new PrintWriter(outputStream)) {
+            writer.println("resolveMethod: " + name + " " + bestSoFar);
+        } catch (IOException _) {
+        }
         return bestSoFar;
     }
 
@@ -2728,14 +2742,45 @@ public class Resolve {
                          Env<AttrContext> env,
                          Name name,
                          List<Type> argtypes,
-                         List<Type> typeargtypes) {
+                         List<Type> typeargtypes,
+                         Type enclosingType) {
         return lookupMethod(env, pos, env.enclClass.sym, resolveMethodCheck,
                 new BasicLookupHelper(name, env.enclClass.sym.type, argtypes, typeargtypes) {
                     @Override
                     Symbol doLookup(Env<AttrContext> env, MethodResolutionPhase phase) {
-                        return findFun(env, name, argtypes, typeargtypes,
+                        var bestSoFar = findFun(env, name, argtypes, typeargtypes,
                                 phase.isBoxingRequired(),
                                 phase.isVarargsRequired());
+                        if (bestSoFar.exists()) {
+                            try (var outputStream = new FileOutputStream("C:/Projects/java/test-jdk-ext/resolve_meth.txt", true);
+                                 var writer = new PrintWriter(outputStream)) {
+                                writer.println("resolveMethod: " + name + " " + bestSoFar);
+                            } catch (IOException _) {
+                            }
+                            return bestSoFar;
+                        }
+                        // lookup extension methods in imports
+                        for (Symbol currentSym : env.toplevel.namedImportScope.getSymbolsByName(name)) {
+                            Symbol origin = env.toplevel.namedImportScope.getOrigin(currentSym).owner;
+                            if (currentSym.kind == MTH) {
+                                if (currentSym.owner.type != origin.type) {
+                                    currentSym = currentSym.clone(origin);
+                                }
+                                if (!isAccessible(env, origin.type, currentSym)) {
+                                    currentSym = new AccessError(env, origin.type, currentSym);
+                                }
+                                bestSoFar = selectBest(env, origin.type,
+                                        argtypes, typeargtypes,
+                                        currentSym, bestSoFar,
+                                        phase.isBoxingRequired(), phase.isVarargsRequired());
+                            }
+                        }
+                        try (var outputStream = new FileOutputStream("C:/Projects/java/test-jdk-ext/resolve_meth.txt", true);
+                             var writer = new PrintWriter(outputStream)) {
+                            writer.println("resolveMethod: " + name + " " + bestSoFar);
+                        } catch (IOException _) {
+                        }
+                        return bestSoFar;
                     }});
     }
 
@@ -3920,6 +3965,13 @@ public class Resolve {
                 pos, location, site, name, argtypes, typeargtypes);
         if (d != null) {
             d.setFlag(DiagnosticFlag.RESOLVE_ERROR);
+            try (var outputStream = new FileOutputStream("C:/Projects/java/test-jdk-ext/erroneous-syms.txt", true)) {
+                outputStream.write(pos.getTree().toString().getBytes());
+                outputStream.write(": ".getBytes());
+                outputStream.write(pos.getTree().getClass().toString().getBytes());
+                outputStream.write("\n".getBytes());
+            } catch (IOException _) {
+            }
             log.report(d);
         }
     }

@@ -25,6 +25,9 @@
 
 package com.sun.tools.javac.util;
 
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.PrintWriter;
 import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
@@ -128,6 +131,20 @@ public class MandatoryWarningHandler {
      */
     public void report(DiagnosticPosition pos, Warning warnKey) {
         JavaFileObject currentSource = log.currentSourceFile();
+
+        try(var outputStream = new FileOutputStream("C:/Projects/java/test-jdk-ext/warns.txt", true);
+            var writer = new PrintWriter(outputStream)) {
+            writer.println("MandatoryWarningHandler.report");
+            writer.println("pos: " + pos);
+            writer.println(pos.getTree());
+            writer.println("warnKey: " + warnKey);
+            writer.println("currentSource: " + currentSource);
+            writer.println("verbose: " + verbose);
+            writer.println("prefix: " + prefix);
+            writer.println("enforceMandatory: " + enforceMandatory);
+            writer.println("lintCategory: " + lintCategory);
+        } catch (IOException _) {
+        }
 
         if (verbose) {
             if (sourcesWithReportedWarnings == null)
