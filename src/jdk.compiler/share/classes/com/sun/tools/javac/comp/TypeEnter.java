@@ -25,6 +25,9 @@
 
 package com.sun.tools.javac.comp;
 
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.PrintWriter;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.function.BiConsumer;
@@ -189,6 +192,11 @@ public class TypeEnter implements Completer {
             sym.completer = this;
             return;
         }
+
+        try (var outputStream = new FileOutputStream("C:/Projects/java/test-jdk-ext/compl.txt", true);
+             var writer = new PrintWriter(outputStream)) {
+            writer.println("Completing symbol: " + sym);
+        } catch (IOException _) { }
 
         try {
             annotate.blockAnnotations();

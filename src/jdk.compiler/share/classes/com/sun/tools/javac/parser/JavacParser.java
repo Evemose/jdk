@@ -26,10 +26,14 @@
 package com.sun.tools.javac.parser;
 
 import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.PrintWriter;
 import java.util.*;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 import javax.lang.model.SourceVersion;
 
@@ -5230,6 +5234,10 @@ public class JavacParser implements Parser {
         var varId = variableDeclaratorId(mods, type, false, lambdaParameter, recordComponent);
         if (isExtensionReciever) {
             varId.nameexpr = F.Ident(varId.name);
+            try (var outputStream = new FileOutputStream("C:/Projects/java/test-jdk-ext/extRes.txt", true);
+                 var writer = new PrintWriter(outputStream)) {
+                writer.println("Extension receiver: " + varId.name);
+            } catch (IOException _) { }
         }
         return varId;
     }

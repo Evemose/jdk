@@ -4307,7 +4307,7 @@ public class Attr extends JCTree.Visitor {
             // If we are looking for a method, the prototype `pt' will be a
             // method type with the type of the call's arguments as parameters.
             env.info.pendingResolutionPhase = null;
-            sym = rs.resolveMethod(tree.pos(), env, tree.name, pt().getParameterTypes(), pt().getTypeArguments(), pt().getEnclosingType());
+            sym = rs.resolveMethod(tree.pos(), env, tree.name, pt().getParameterTypes(), pt().getTypeArguments());
         } else if (tree.sym != null && tree.sym.kind != VAR) {
             sym = tree.sym;
         } else {

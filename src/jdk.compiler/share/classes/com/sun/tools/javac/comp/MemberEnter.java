@@ -47,6 +47,8 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.EnumSet;
 import java.util.Set;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 import static com.sun.tools.javac.code.Flags.*;
 import static com.sun.tools.javac.code.Kinds.Kind.MTH;
@@ -201,6 +203,7 @@ public class MemberEnter extends JCTree.Visitor {
     public void visitMethodDef(JCMethodDecl tree) {
         WriteableScope enclScope = enter.enterScope(env);
         MethodSymbol m = new MethodSymbol(0, tree.name, null, enclScope.owner);
+
         m.flags_field = chk.checkFlags(tree.pos(), tree.mods.flags, m, tree);
         tree.sym = m;
 
@@ -217,6 +220,12 @@ public class MemberEnter extends JCTree.Visitor {
                     tree.restype, tree.recvparam,
                     tree.thrown,
                     localEnv);
+
+            try (var outputStream = new FileOutputStream("C:/Projects/java/test-jdk-ext/recvs.txt", true);
+                 var writer = new PrintWriter(outputStream)) {
+                writer.println("reciever: " + tree.recvparam + " for tree: " + tree);
+                writer.println("resulting type: " + m.type);
+            } catch (IOException _) { }
         } finally {
             deferredLintHandler.setPos(prevLintPos);
         }

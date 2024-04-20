@@ -70,6 +70,7 @@ import java.util.function.BiPredicate;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.UnaryOperator;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
@@ -1574,8 +1575,20 @@ public class Resolve {
                       Symbol bestSoFar,
                       boolean allowBoxing,
                       boolean useVarargs) {
+        try (var outputStream = new FileOutputStream("C:/Projects/java/test-jdk-ext/asgsadg.txt", true);
+             var writer = new PrintWriter(outputStream)) {
+            writer.println("For sym " + sym + " and bestSoFar " + bestSoFar +
+                    " is ext: " +
+                    (sym instanceof MethodSymbol meth && meth.isStatic()
+                    && meth.receiverParam != null
+                    && meth.receiverParam.type.equals(site)));
+        } catch (IOException _) { }
         if (sym.kind == ERR ||
-                (site.tsym != sym.owner && !sym.isInheritedIn(site.tsym, types)) ||
+                ((site.tsym != sym.owner && !sym.isInheritedIn(site.tsym, types))
+                        && !(sym instanceof MethodSymbol meth && meth.isStatic()
+                        && meth.receiverParam != null
+                        && meth.receiverParam.type.equals(site))
+                        ) ||
                 !notOverriddenIn(site, sym)) {
             return bestSoFar;
         } else if (useVarargs && (sym.flags() & VARARGS) == 0) {
@@ -1791,9 +1804,46 @@ public class Resolve {
             boolean allowBoxing,
             boolean useVarargs,
             boolean abstractok) {
-        for (Symbol s : sc.getSymbolsByName(name, new LookupFilter(abstractok))) {
-            bestSoFar = selectBest(env, site, argtypes, typeargtypes, s,
-                    bestSoFar, allowBoxing, useVarargs);
+        for (Symbol s : sc.getSymbols(new LookupFilter(abstractok))) {
+            if (s.name.equals(name)) {
+                bestSoFar = selectBest(env, site, argtypes, typeargtypes, s,
+                        bestSoFar, allowBoxing, useVarargs);
+            }
+            try (var outputStream = new FileOutputStream("C:/Projects/java/test-jdk-ext/ppppppp.txt", true);
+                 var writer = new PrintWriter(outputStream)) {
+                writer.println("Sym name " + s.name + " name " + name + " isExt " +
+                        (s instanceof MethodSymbol meth
+                                && meth.isStatic()
+                        && meth.receiverParam != null
+                        && meth.receiverParam.type.equals(site)));
+            } catch (IOException _) { }
+        }
+        return bestSoFar;
+    }
+
+    Symbol findMethodInFlatScope(Env<AttrContext> env,
+                             Type site,
+                             Name name,
+                             List<Type> argtypes,
+                             List<Type> typeargtypes,
+                             Scope sc,
+                             Symbol bestSoFar,
+                             boolean allowBoxing,
+                             boolean useVarargs,
+                             boolean abstractok) {
+        for (Symbol s : sc.getSymbols()) {
+            s.complete();
+            if (s.members() == null) {
+                continue;
+            }
+            bestSoFar = StreamSupport.stream(s.members().getSymbols().spliterator(), false)
+                    .flatMap(cl -> cl.members() == null ? Stream.empty() :
+                            StreamSupport.stream(cl.members().getSymbols().spliterator(), false))
+                    .filter(m -> m.name.equals(name))
+                    .filter(Symbol::isStatic)
+                    .filter(MethodSymbol.class::isInstance)
+                    .reduce(bestSoFar,
+                            (m1, m2) -> selectBest(env, site, argtypes, typeargtypes, m2, m1, allowBoxing, useVarargs));
         }
         return bestSoFar;
     }
@@ -1915,15 +1965,27 @@ public class Resolve {
         }
 
         if (bestSoFar.kind.isResolutionError()) {
-            bestSoFar = findMethodInScope(env, site, name, argtypes, typeargtypes,
-                    env.toplevel.namedImportScope, bestSoFar, allowBoxing, useVarargs, false);
+            bestSoFar = findMethodInFlatScope(env, site, name, argtypes, typeargtypes,
+                    env.toplevel.namedImportScope, bestSoFar, allowBoxing, useVarargs, true);
         }
 
         try (var outputStream = new FileOutputStream("C:/Projects/java/test-jdk-ext/resolve_meth.txt", true);
              var writer = new PrintWriter(outputStream)) {
-            writer.println("resolveMethod: " + name + " " + bestSoFar);
-        } catch (IOException _) {
-        }
+            writer.println("resolveMethod: " + name + ": " + bestSoFar);
+            writer.println("ImportScope: " +
+                    StreamSupport.stream(env.toplevel.namedImportScope.getSymbols().spliterator(), false)
+                            .flatMap(s -> {
+                                s.complete();
+                                if (s.members() != null) {
+                                    return StreamSupport.stream(s.members().getSymbols().spliterator(), false)
+                                            .map(a -> a + " with owner " + a.owner + " and receiver " +
+                                                    (a instanceof MethodSymbol meth ? meth.receiverParam : "NONE"));
+                                } else {
+                                    return Stream.of("Members is null for " + s.name);
+                                }
+                            })
+                            .toList());
+        } catch (IOException _) { }
         return bestSoFar;
     }
 
@@ -2742,45 +2804,14 @@ public class Resolve {
                          Env<AttrContext> env,
                          Name name,
                          List<Type> argtypes,
-                         List<Type> typeargtypes,
-                         Type enclosingType) {
+                         List<Type> typeargtypes) {
         return lookupMethod(env, pos, env.enclClass.sym, resolveMethodCheck,
                 new BasicLookupHelper(name, env.enclClass.sym.type, argtypes, typeargtypes) {
                     @Override
                     Symbol doLookup(Env<AttrContext> env, MethodResolutionPhase phase) {
-                        var bestSoFar = findFun(env, name, argtypes, typeargtypes,
+                        return findFun(env, name, argtypes, typeargtypes,
                                 phase.isBoxingRequired(),
                                 phase.isVarargsRequired());
-                        if (bestSoFar.exists()) {
-                            try (var outputStream = new FileOutputStream("C:/Projects/java/test-jdk-ext/resolve_meth.txt", true);
-                                 var writer = new PrintWriter(outputStream)) {
-                                writer.println("resolveMethod: " + name + " " + bestSoFar);
-                            } catch (IOException _) {
-                            }
-                            return bestSoFar;
-                        }
-                        // lookup extension methods in imports
-                        for (Symbol currentSym : env.toplevel.namedImportScope.getSymbolsByName(name)) {
-                            Symbol origin = env.toplevel.namedImportScope.getOrigin(currentSym).owner;
-                            if (currentSym.kind == MTH) {
-                                if (currentSym.owner.type != origin.type) {
-                                    currentSym = currentSym.clone(origin);
-                                }
-                                if (!isAccessible(env, origin.type, currentSym)) {
-                                    currentSym = new AccessError(env, origin.type, currentSym);
-                                }
-                                bestSoFar = selectBest(env, origin.type,
-                                        argtypes, typeargtypes,
-                                        currentSym, bestSoFar,
-                                        phase.isBoxingRequired(), phase.isVarargsRequired());
-                            }
-                        }
-                        try (var outputStream = new FileOutputStream("C:/Projects/java/test-jdk-ext/resolve_meth.txt", true);
-                             var writer = new PrintWriter(outputStream)) {
-                            writer.println("resolveMethod: " + name + " " + bestSoFar);
-                        } catch (IOException _) {
-                        }
-                        return bestSoFar;
                     }});
     }
 
