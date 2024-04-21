@@ -221,11 +221,6 @@ public class MemberEnter extends JCTree.Visitor {
                     tree.thrown,
                     localEnv);
 
-            try (var outputStream = new FileOutputStream("C:/Projects/java/test-jdk-ext/recvs.txt", true);
-                 var writer = new PrintWriter(outputStream)) {
-                writer.println("reciever: " + tree.recvparam + " for tree: " + tree);
-                writer.println("resulting type: " + m.type);
-            } catch (IOException _) { }
         } finally {
             deferredLintHandler.setPos(prevLintPos);
         }
@@ -242,6 +237,11 @@ public class MemberEnter extends JCTree.Visitor {
             params.append(Assert.checkNonNull(param.sym));
         }
         m.params = params.toList();
+
+        // Set m.receiverParam if present
+        if (tree.recvparam != null) {
+            m.receiverParam = Assert.checkNonNull(tree.recvparam.sym);
+        }
 
         // mark the method varargs, if necessary
         if (lastParam != null && (lastParam.mods.flags & Flags.VARARGS) != 0)

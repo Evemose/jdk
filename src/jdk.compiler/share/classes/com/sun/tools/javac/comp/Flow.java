@@ -3399,11 +3399,6 @@ public class Flow {
 
         @Override
         public void visitIdent(JCIdent tree) {
-            try(var outputStream = new FileOutputStream("C:/Projects/java/test-jdk-ext/internal.txt", true);
-                var writer = new PrintWriter(outputStream)) {
-                writer.println("visitIdent: " + tree);
-            } catch (IOException _) {
-            }
             if (tree.sym != null && tree.sym.kind == VAR) {
                 checkEffectivelyFinal(tree, (VarSymbol)tree.sym);
             }

@@ -54,9 +54,6 @@ import com.sun.tools.javac.util.JCDiagnostic.DiagnosticFlag;
 import com.sun.tools.javac.util.JCDiagnostic.DiagnosticPosition;
 import com.sun.tools.javac.util.JCDiagnostic.DiagnosticType;
 
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.PrintWriter;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.EnumSet;
@@ -70,7 +67,6 @@ import java.util.function.BiPredicate;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.UnaryOperator;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
@@ -1575,20 +1571,8 @@ public class Resolve {
                       Symbol bestSoFar,
                       boolean allowBoxing,
                       boolean useVarargs) {
-        try (var outputStream = new FileOutputStream("C:/Projects/java/test-jdk-ext/asgsadg.txt", true);
-             var writer = new PrintWriter(outputStream)) {
-            writer.println("For sym " + sym + " and bestSoFar " + bestSoFar +
-                    " is ext: " +
-                    (sym instanceof MethodSymbol meth && meth.isStatic()
-                    && meth.receiverParam != null
-                    && meth.receiverParam.type.equals(site)));
-        } catch (IOException _) { }
         if (sym.kind == ERR ||
-                ((site.tsym != sym.owner && !sym.isInheritedIn(site.tsym, types))
-                        && !(sym instanceof MethodSymbol meth && meth.isStatic()
-                        && meth.receiverParam != null
-                        && meth.receiverParam.type.equals(site))
-                        ) ||
+                (site.tsym != sym.owner && !sym.isInheritedIn(site.tsym, types)) ||
                 !notOverriddenIn(site, sym)) {
             return bestSoFar;
         } else if (useVarargs && (sym.flags() & VARARGS) == 0) {
@@ -1804,19 +1788,9 @@ public class Resolve {
             boolean allowBoxing,
             boolean useVarargs,
             boolean abstractok) {
-        for (Symbol s : sc.getSymbols(new LookupFilter(abstractok))) {
-            if (s.name.equals(name)) {
-                bestSoFar = selectBest(env, site, argtypes, typeargtypes, s,
-                        bestSoFar, allowBoxing, useVarargs);
-            }
-            try (var outputStream = new FileOutputStream("C:/Projects/java/test-jdk-ext/ppppppp.txt", true);
-                 var writer = new PrintWriter(outputStream)) {
-                writer.println("Sym name " + s.name + " name " + name + " isExt " +
-                        (s instanceof MethodSymbol meth
-                                && meth.isStatic()
-                        && meth.receiverParam != null
-                        && meth.receiverParam.type.equals(site)));
-            } catch (IOException _) { }
+        for (Symbol s : sc.getSymbolsByName(name, new LookupFilter(abstractok))) {
+            bestSoFar = selectBest(env, site, argtypes, typeargtypes, s,
+                    bestSoFar, allowBoxing, useVarargs);
         }
         return bestSoFar;
     }
@@ -1829,21 +1803,21 @@ public class Resolve {
                              Scope sc,
                              Symbol bestSoFar,
                              boolean allowBoxing,
-                             boolean useVarargs,
-                             boolean abstractok) {
+                             boolean useVarargs) {
         for (Symbol s : sc.getSymbols()) {
             s.complete();
             if (s.members() == null) {
                 continue;
             }
-            bestSoFar = StreamSupport.stream(s.members().getSymbols().spliterator(), false)
-                    .flatMap(cl -> cl.members() == null ? Stream.empty() :
-                            StreamSupport.stream(cl.members().getSymbols().spliterator(), false))
-                    .filter(m -> m.name.equals(name))
-                    .filter(Symbol::isStatic)
-                    .filter(MethodSymbol.class::isInstance)
-                    .reduce(bestSoFar,
-                            (m1, m2) -> selectBest(env, site, argtypes, typeargtypes, m2, m1, allowBoxing, useVarargs));
+            for (Symbol s1 : s.members().getSymbolsByName(name, new LookupFilter(false))) {
+                if (s1 instanceof MethodSymbol meth
+                        && s1.isStatic()
+                        && meth.receiverParam != null
+                        && site.equals(meth.receiverParam.type)) {
+                    bestSoFar = selectBest(env, site, argtypes, typeargtypes, s1,
+                            bestSoFar, allowBoxing, useVarargs);
+                }
+            }
         }
         return bestSoFar;
     }
@@ -1966,26 +1940,9 @@ public class Resolve {
 
         if (bestSoFar.kind.isResolutionError()) {
             bestSoFar = findMethodInFlatScope(env, site, name, argtypes, typeargtypes,
-                    env.toplevel.namedImportScope, bestSoFar, allowBoxing, useVarargs, true);
+                    env.toplevel.namedImportScope, bestSoFar, allowBoxing, useVarargs);
         }
 
-        try (var outputStream = new FileOutputStream("C:/Projects/java/test-jdk-ext/resolve_meth.txt", true);
-             var writer = new PrintWriter(outputStream)) {
-            writer.println("resolveMethod: " + name + ": " + bestSoFar);
-            writer.println("ImportScope: " +
-                    StreamSupport.stream(env.toplevel.namedImportScope.getSymbols().spliterator(), false)
-                            .flatMap(s -> {
-                                s.complete();
-                                if (s.members() != null) {
-                                    return StreamSupport.stream(s.members().getSymbols().spliterator(), false)
-                                            .map(a -> a + " with owner " + a.owner + " and receiver " +
-                                                    (a instanceof MethodSymbol meth ? meth.receiverParam : "NONE"));
-                                } else {
-                                    return Stream.of("Members is null for " + s.name);
-                                }
-                            })
-                            .toList());
-        } catch (IOException _) { }
         return bestSoFar;
     }
 
@@ -3996,13 +3953,6 @@ public class Resolve {
                 pos, location, site, name, argtypes, typeargtypes);
         if (d != null) {
             d.setFlag(DiagnosticFlag.RESOLVE_ERROR);
-            try (var outputStream = new FileOutputStream("C:/Projects/java/test-jdk-ext/erroneous-syms.txt", true)) {
-                outputStream.write(pos.getTree().toString().getBytes());
-                outputStream.write(": ".getBytes());
-                outputStream.write(pos.getTree().getClass().toString().getBytes());
-                outputStream.write("\n".getBytes());
-            } catch (IOException _) {
-            }
             log.report(d);
         }
     }

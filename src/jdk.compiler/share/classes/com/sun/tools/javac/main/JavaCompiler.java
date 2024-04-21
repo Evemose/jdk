@@ -29,7 +29,17 @@ import java.io.*;
 import java.nio.file.FileSystemNotFoundException;
 import java.nio.file.InvalidPathException;
 import java.nio.file.ReadOnlyFileSystemException;
-import java.util.*;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.Map;
+import java.util.MissingResourceException;
+import java.util.Queue;
+import java.util.ResourceBundle;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.function.ToIntFunction;
 
@@ -69,7 +79,6 @@ import com.sun.tools.javac.util.*;
 import com.sun.tools.javac.util.Context.Key;
 import com.sun.tools.javac.util.DefinedBy.Api;
 import com.sun.tools.javac.util.JCDiagnostic.Factory;
-import com.sun.tools.javac.util.List;
 import com.sun.tools.javac.util.Log.DiagnosticHandler;
 import com.sun.tools.javac.util.Log.DiscardDiagnosticHandler;
 import com.sun.tools.javac.util.Log.WriterKind;
@@ -975,8 +984,6 @@ public class JavaCompiler {
         } catch (Abort ex) {
             if (devVerbose)
                 ex.printStackTrace(System.err);
-
-
 
             // In case an Abort was thrown before processAnnotations could be called,
             // we could have deferred diagnostics that haven't been reported.

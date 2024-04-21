@@ -673,7 +673,7 @@ public class Log extends AbstractLog {
      */
     @Override
     public void report(JCDiagnostic diagnostic) {
-        try (var output = new FileOutputStream("C:/Projects/java/test-jdk-ext/errors.txt", true)) {
+        try (var output = new FileOutputStream("C:/Projects/java/test-ext/errors.txt", true)) {
             output.write(
                     Arrays.toString(Thread.currentThread().getStackTrace()).replace(',', '\n')
                             .getBytes(StandardCharsets.UTF_8));

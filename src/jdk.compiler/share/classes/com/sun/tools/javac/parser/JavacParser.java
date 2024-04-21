@@ -25,15 +25,10 @@
 
 package com.sun.tools.javac.parser;
 
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.PrintWriter;
 import java.util.*;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
-import java.util.stream.StreamSupport;
 
 import javax.lang.model.SourceVersion;
 
@@ -3174,8 +3169,7 @@ public class JavacParser implements Parser {
         JCExpression paramType = catchTypes.size() > 1 ?
                 toP(F.at(catchTypes.head.getStartPosition()).TypeUnion(catchTypes)) :
                 catchTypes.head;
-        JCVariableDecl formal = variableDeclaratorId(
-                mods, paramType, true, false, false);
+        JCVariableDecl formal = variableDeclaratorId(mods, paramType, true, false, false);
         accept(RPAREN);
         JCBlock body = block();
         return F.at(pos).Catch(formal, body);
@@ -3837,14 +3831,6 @@ public class JavacParser implements Parser {
                 pn = qualident(false);
             }
             if (pn.hasTag(Tag.IDENT) && ((JCIdent)pn).name != names._this) {
-                try (var outputStream = new FileOutputStream("C:/Projects/java/test-jdk2/output.txt", true)) {
-                    outputStream.write(pn.toString().getBytes());
-                    outputStream.write(" name: ".getBytes());
-                    outputStream.write(String.valueOf(((JCIdent)pn).name).getBytes());
-                    outputStream.write("\n".getBytes());
-                } catch (Exception _) {
-
-                }
                 name = ((JCIdent)pn).name;
             } else if (lambdaParameter && type == null) {
                 // we have a lambda parameter that is not an identifier this is a syntax error
@@ -5206,14 +5192,16 @@ public class JavacParser implements Parser {
         if (recordComponent) {
             mods.flags |= Flags.RECORD | Flags.FINAL | Flags.PRIVATE | Flags.GENERATED_MEMBER;
         }
-        // need to distinguish between vararg annos and array annos
-        // look at typeAnnotationsPushedBack comment
-        this.permitTypeAnnotationsPushBack = true;
+
         boolean isExtensionReciever = false;
         if (token.kind == EXTENDS) {
             isExtensionReciever = true;
             nextToken();
         }
+
+        // need to distinguish between vararg annos and array annos
+        // look at typeAnnotationsPushedBack comment
+        this.permitTypeAnnotationsPushBack = true;
         JCExpression type = parseType(lambdaParameter);
         this.permitTypeAnnotationsPushBack = false;
 
@@ -5233,11 +5221,7 @@ public class JavacParser implements Parser {
         }
         var varId = variableDeclaratorId(mods, type, false, lambdaParameter, recordComponent);
         if (isExtensionReciever) {
-            varId.nameexpr = F.Ident(varId.name);
-            try (var outputStream = new FileOutputStream("C:/Projects/java/test-jdk-ext/extRes.txt", true);
-                 var writer = new PrintWriter(outputStream)) {
-                writer.println("Extension receiver: " + varId.name);
-            } catch (IOException _) { }
+            varId.nameexpr = toP(F.at(varId.pos).Ident(names._this));
         }
         return varId;
     }

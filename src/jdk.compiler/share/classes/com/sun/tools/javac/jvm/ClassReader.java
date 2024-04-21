@@ -39,8 +39,6 @@ import java.util.Set;
 import java.util.function.BiFunction;
 import java.util.function.IntFunction;
 import java.util.function.Predicate;
-import java.util.stream.Stream;
-import java.util.stream.StreamSupport;
 
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.NestingKind;
