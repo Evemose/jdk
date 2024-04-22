@@ -546,6 +546,7 @@ public class Flags {
         RECORD(Flags.RECORD),
         RECOVERABLE(Flags.RECOVERABLE),
         SEALED(Flags.SEALED),
+        EXTENSION(Flags.EXTENSION),
         NON_SEALED(Flags.NON_SEALED) {
             @Override
             public String toString() {

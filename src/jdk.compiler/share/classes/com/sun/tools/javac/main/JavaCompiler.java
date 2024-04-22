@@ -1609,6 +1609,7 @@ public class JavaCompiler {
             if (shouldStop(CompileState.TRANSEXTENSIONS))
                 return;
 
+            // has to run before TransTypes in order to omit AssertionErrors due to parameter types incompatibility
             env.tree = TransExtensions.instance(context).translateTopLevelClass(env, env.tree, localMake, context);
 
             compileStates.put(env, CompileState.TRANSEXTENSIONS);
