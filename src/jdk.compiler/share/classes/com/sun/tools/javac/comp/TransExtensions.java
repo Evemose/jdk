@@ -40,8 +40,8 @@ public class TransExtensions extends TreeTranslator {
             sym = (Symbol.MethodSymbol) fieldAccess.sym;
         } else if (tree.meth instanceof JCTree.JCIdent ident) {
             Type firstParamType;
-            if (((Symbol.MethodSymbol) ident.sym).params != null
-            && ((Symbol.MethodSymbol) ident.sym).params.isEmpty()) {
+            if (((Symbol.MethodSymbol) ident.sym).params == null
+            || ((Symbol.MethodSymbol) ident.sym).params.isEmpty()) {
                 // method without parameters cant be extension
                 return;
             } else {
