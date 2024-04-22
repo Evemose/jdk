@@ -25,6 +25,14 @@
 
 package com.sun.tools.javac.comp;
 
+import java.util.*;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
+import java.util.stream.Stream;
+
+import javax.lang.model.element.ElementKind;
+import javax.tools.JavaFileObject;
+
 import com.sun.source.tree.CaseTree;
 import com.sun.source.tree.IdentifierTree;
 import com.sun.source.tree.MemberReferenceTree.ReferenceMode;
@@ -42,37 +50,38 @@ import com.sun.tools.javac.comp.ArgumentAttr.LocalCacheContext;
 import com.sun.tools.javac.comp.Check.CheckContext;
 import com.sun.tools.javac.comp.DeferredAttr.AttrMode;
 import com.sun.tools.javac.comp.MatchBindingsComputer.MatchBindings;
-import com.sun.tools.javac.jvm.ByteCodes;
-import com.sun.tools.javac.jvm.Target;
+import com.sun.tools.javac.jvm.*;
+
+import static com.sun.tools.javac.resources.CompilerProperties.Fragments.Diamond;
+import static com.sun.tools.javac.resources.CompilerProperties.Fragments.DiamondInvalidArg;
+import static com.sun.tools.javac.resources.CompilerProperties.Fragments.DiamondInvalidArgs;
+
 import com.sun.tools.javac.resources.CompilerProperties.Errors;
 import com.sun.tools.javac.resources.CompilerProperties.Fragments;
 import com.sun.tools.javac.resources.CompilerProperties.Warnings;
 import com.sun.tools.javac.tree.*;
 import com.sun.tools.javac.tree.JCTree.*;
-import com.sun.tools.javac.tree.JCTree.JCPolyExpression.PolyKind;
+import com.sun.tools.javac.tree.JCTree.JCPolyExpression.*;
 import com.sun.tools.javac.util.*;
 import com.sun.tools.javac.util.DefinedBy.Api;
+import com.sun.tools.javac.util.JCDiagnostic.DiagnosticPosition;
 import com.sun.tools.javac.util.JCDiagnostic.Error;
+import com.sun.tools.javac.util.JCDiagnostic.Fragment;
+import com.sun.tools.javac.util.JCDiagnostic.Warning;
 import com.sun.tools.javac.util.List;
 import com.sun.tools.javac.util.JCDiagnostic.*;
 
-import javax.lang.model.element.ElementKind;
-import javax.tools.JavaFileObject;
-import java.util.*;
-import java.util.function.BiConsumer;
-import java.util.function.Consumer;
-import java.util.stream.Stream;
-
+import static com.sun.tools.javac.code.Flags.*;
 import static com.sun.tools.javac.code.Flags.ANNOTATION;
 import static com.sun.tools.javac.code.Flags.BLOCK;
-import static com.sun.tools.javac.code.Flags.*;
-import static com.sun.tools.javac.code.Kinds.Kind;
-import static com.sun.tools.javac.code.Kinds.Kind.*;
 import static com.sun.tools.javac.code.Kinds.*;
+import static com.sun.tools.javac.code.Kinds.Kind.*;
+import static com.sun.tools.javac.code.TypeTag.*;
 import static com.sun.tools.javac.code.TypeTag.WILDCARD;
 import static com.sun.tools.javac.code.TypeTag.*;
 import static com.sun.tools.javac.resources.CompilerProperties.Fragments.*;
 import static com.sun.tools.javac.tree.JCTree.Tag.*;
+import com.sun.tools.javac.util.JCDiagnostic.DiagnosticFlag;
 
 /** This is the main context-dependent analysis phase in GJC. It
  *  encompasses name resolution, type checking and constant folding as

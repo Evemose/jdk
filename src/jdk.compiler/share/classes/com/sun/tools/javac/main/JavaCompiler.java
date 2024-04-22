@@ -1634,7 +1634,6 @@ public class JavaCompiler {
 
             compileStates.put(env, CompileState.TRANSPATTERNS);
 
-
             if (scanner.hasLambdas) {
                 if (shouldStop(CompileState.UNLAMBDA))
                     return;

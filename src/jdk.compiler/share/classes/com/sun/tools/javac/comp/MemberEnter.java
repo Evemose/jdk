@@ -25,15 +25,19 @@
 
 package com.sun.tools.javac.comp;
 
+import java.util.EnumSet;
+import java.util.Set;
+
 import com.sun.tools.javac.code.*;
 import com.sun.tools.javac.code.Scope.WriteableScope;
+import com.sun.tools.javac.tree.*;
+import com.sun.tools.javac.util.*;
+import com.sun.tools.javac.util.JCDiagnostic.DiagnosticPosition;
+import com.sun.tools.javac.util.JCDiagnostic.Error;
 import com.sun.tools.javac.code.Source.Feature;
-import com.sun.tools.javac.code.Symbol.CompletionFailure;
-import com.sun.tools.javac.code.Symbol.MethodSymbol;
-import com.sun.tools.javac.code.Symbol.VarSymbol;
-import com.sun.tools.javac.code.Type.ArrayType;
-import com.sun.tools.javac.code.Type.ForAll;
-import com.sun.tools.javac.code.Type.MethodType;
+
+import com.sun.tools.javac.code.Symbol.*;
+import com.sun.tools.javac.code.Type.*;
 import com.sun.tools.javac.resources.CompilerProperties.Errors;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.tree.JCTree.*;
@@ -51,25 +55,21 @@ import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
 import static com.sun.tools.javac.code.Flags.*;
-import static com.sun.tools.javac.code.Kinds.Kind.MTH;
-import static com.sun.tools.javac.code.Kinds.Kind.TYP;
-import static com.sun.tools.javac.code.Kinds.KindSelector;
+import static com.sun.tools.javac.code.Kinds.*;
+import static com.sun.tools.javac.code.Kinds.Kind.*;
 import static com.sun.tools.javac.code.TypeTag.TYPEVAR;
 
-/**
- * Resolves field, method and constructor header, and constructs corresponding Symbols.
+/** Resolves field, method and constructor header, and constructs corresponding Symbols.
  *
- * <p><b>This is NOT part of any supported API.
- * If you write code that depends on this, you do so at your own risk.
- * This code and its internal interfaces are subject to change or
- * deletion without notice.</b>
+ *  <p><b>This is NOT part of any supported API.
+ *  If you write code that depends on this, you do so at your own risk.
+ *  This code and its internal interfaces are subject to change or
+ *  deletion without notice.</b>
  */
 public class MemberEnter extends JCTree.Visitor {
     protected static final Context.Key<MemberEnter> memberEnterKey = new Context.Key<>();
 
-    /**
-     * The Source language setting.
-     */
+    /** The Source language setting. */
     private final Source source;
     private final Enter enter;
     private final Log log;
@@ -103,17 +103,15 @@ public class MemberEnter extends JCTree.Visitor {
         deferredLintHandler = DeferredLintHandler.instance(context);
     }
 
-    /**
-     * Construct method type from method signature.
-     *
-     * @param typarams  The method's type parameters.
-     * @param params    The method's value parameters.
-     * @param res       The method's result type,
-     *                  null if it is a constructor.
-     * @param recvparam The method's receiver parameter,
-     *                  null if none given; TODO: or already set here?
-     * @param thrown    The method's thrown exceptions.
-     * @param env       The method's (local) environment.
+    /** Construct method type from method signature.
+     *  @param typarams    The method's type parameters.
+     *  @param params      The method's value parameters.
+     *  @param res             The method's result type,
+     *                 null if it is a constructor.
+     *  @param recvparam       The method's receiver parameter,
+     *                 null if none given; TODO: or already set here?
+     *  @param thrown      The method's thrown exceptions.
+     *  @param env             The method's (local) environment.
      */
     Type signature(MethodSymbol msym,
                    List<JCTypeParameter> typarams,
@@ -139,7 +137,7 @@ public class MemberEnter extends JCTree.Visitor {
 
         // Attribute receiver type, if one is given.
         Type recvtype;
-        if (recvparam != null) {
+        if (recvparam!=null) {
             memberEnter(recvparam, env);
             recvtype = recvparam.vartype.type;
         } else {
@@ -159,41 +157,38 @@ public class MemberEnter extends JCTree.Visitor {
             thrownbuf.append(exc);
         }
         MethodType mtype = new MethodType(argbuf.toList(),
-                restype,
-                thrownbuf.toList(),
-                syms.methodClass);
+                                    restype,
+                                    thrownbuf.toList(),
+                                    syms.methodClass);
         mtype.recvtype = recvtype;
 
         return tvars.isEmpty() ? mtype : new ForAll(tvars, mtype);
     }
 
-    /* ********************************************************************
-     * Visitor methods for member enter
-     *********************************************************************/
+/* ********************************************************************
+ * Visitor methods for member enter
+ *********************************************************************/
 
-    /**
-     * Visitor argument: the current environment
+    /** Visitor argument: the current environment
      */
     protected Env<AttrContext> env;
 
-    /**
-     * Enter field and method definitions and process import
-     * clauses, catching any completion failure exceptions.
+    /** Enter field and method definitions and process import
+     *  clauses, catching any completion failure exceptions.
      */
     protected void memberEnter(JCTree tree, Env<AttrContext> env) {
         Env<AttrContext> prevEnv = this.env;
         try {
             this.env = env;
             tree.accept(this);
-        } catch (CompletionFailure ex) {
+        }  catch (CompletionFailure ex) {
             chk.completionError(tree.pos(), ex);
         } finally {
             this.env = prevEnv;
         }
     }
 
-    /**
-     * Enter members from a list of trees.
+    /** Enter members from a list of trees.
      */
     void memberEnter(List<? extends JCTree> trees, Env<AttrContext> env) {
         for (List<? extends JCTree> l = trees; l.nonEmpty(); l = l.tail)
@@ -203,7 +198,6 @@ public class MemberEnter extends JCTree.Visitor {
     public void visitMethodDef(JCMethodDecl tree) {
         WriteableScope enclScope = enter.enterScope(env);
         MethodSymbol m = new MethodSymbol(0, tree.name, null, enclScope.owner);
-
         m.flags_field = chk.checkFlags(tree.pos(), tree.mods.flags, m, tree);
         tree.sym = m;
 
@@ -217,10 +211,9 @@ public class MemberEnter extends JCTree.Visitor {
         try {
             // Compute the method type
             m.type = signature(m, tree.typarams, tree.params,
-                    tree.restype, tree.recvparam,
-                    tree.thrown,
-                    localEnv);
-
+                               tree.restype, tree.recvparam,
+                               tree.thrown,
+                               localEnv);
         } finally {
             deferredLintHandler.setPos(prevLintPos);
         }
@@ -244,7 +237,7 @@ public class MemberEnter extends JCTree.Visitor {
 
         localEnv.info.scope.leave();
         if (chk.checkUnique(tree.pos(), m, enclScope)) {
-            enclScope.enter(m);
+        enclScope.enter(m);
         }
 
         annotate.annotateLater(tree.mods.annotations, localEnv, m, tree.pos());
@@ -258,20 +251,18 @@ public class MemberEnter extends JCTree.Visitor {
         }
     }
 
-    /**
-     * Create a fresh environment for method bodies.
-     *
-     * @param tree The method definition.
-     * @param env  The environment current outside of the method definition.
+    /** Create a fresh environment for method bodies.
+     *  @param tree     The method definition.
+     *  @param env      The environment current outside of the method definition.
      */
     Env<AttrContext> methodEnv(JCMethodDecl tree, Env<AttrContext> env) {
         Env<AttrContext> localEnv =
-                env.dup(tree, env.info.dup(env.info.scope.dupUnshared(tree.sym)));
+            env.dup(tree, env.info.dup(env.info.scope.dupUnshared(tree.sym)));
         localEnv.enclMethod = tree;
         if (tree.sym.type != null) {
             //when this is called in the enter stage, there's no type to be set
             localEnv.info.returnResult = attr.new ResultInfo(KindSelector.VAL,
-                    tree.sym.type.getReturnType());
+                                                             tree.sym.type.getReturnType());
         }
         if ((tree.mods.flags & STATIC) != 0) localEnv.info.staticLevel++;
         localEnv.info.yieldResult = null;
@@ -281,7 +272,7 @@ public class MemberEnter extends JCTree.Visitor {
     public void visitVarDef(JCVariableDecl tree) {
         Env<AttrContext> localEnv = env;
         if ((tree.mods.flags & STATIC) != 0 ||
-                (env.info.scope.owner.flags() & INTERFACE) != 0) {
+            (env.info.scope.owner.flags() & INTERFACE) != 0) {
             localEnv = env.dup(tree, env.info.dup());
             localEnv.info.staticLevel++;
         }
@@ -289,7 +280,7 @@ public class MemberEnter extends JCTree.Visitor {
 
         try {
             if (TreeInfo.isEnumInit(tree)) {
-                attr.attribIdentAsEnumType(localEnv, (JCIdent) tree.vartype);
+                attr.attribIdentAsEnumType(localEnv, (JCIdent)tree.vartype);
             } else if (!tree.isImplicitlyTyped()) {
                 attr.attribType(tree.vartype, localEnv);
                 if (TreeInfo.isReceiverParam(tree))
@@ -306,7 +297,7 @@ public class MemberEnter extends JCTree.Visitor {
             //because varargs is represented in the tree as a
             //modifier on the parameter declaration, and not as a
             //distinct type of array node.
-            ArrayType atype = (ArrayType) tree.vartype.type;
+            ArrayType atype = (ArrayType)tree.vartype.type;
             tree.vartype.type = atype.makeVarargs();
         }
         WriteableScope enclScope = enter.enterScope(env);
@@ -320,14 +311,14 @@ public class MemberEnter extends JCTree.Visitor {
         if (tree.init != null) {
             v.flags_field |= HASINIT;
             if ((v.flags_field & FINAL) != 0 &&
-                    needsLazyConstValue(tree.init)) {
+                needsLazyConstValue(tree.init)) {
                 Env<AttrContext> initEnv = getInitEnv(tree, env);
                 initEnv.info.enclVar = v;
                 v.setLazyConstValue(initEnv(tree, initEnv), attr, tree);
             }
         }
 
-        if (!(Feature.UNNAMED_VARIABLES.allowedInSource(source) && tree.sym.isUnnamedVariable())) {
+        if(!(Feature.UNNAMED_VARIABLES.allowedInSource(source) && tree.sym.isUnnamedVariable())) {
             if (chk.checkUnique(tree.pos(), v, enclScope)) {
                 chk.checkTransparentVar(tree.pos(), v, enclScope);
                 enclScope.enter(v);
@@ -344,25 +335,14 @@ public class MemberEnter extends JCTree.Visitor {
 
         v.pos = tree.pos;
     }
-
     // where
     void checkType(JCTree tree, Type type, Error errorKey) {
         if (!tree.type.isErroneous() && !types.isSameType(tree.type, type)) {
             log.error(tree, errorKey);
         }
     }
-
     void checkReceiver(JCVariableDecl tree, Env<AttrContext> localEnv) {
-        tree.type = tree.vartype.type;
-        tree.sym = new VarSymbol(Flags.PARAMETER, tree.name, tree.type, localEnv.enclMethod.sym);
-        try (var outputStream = new FileOutputStream("C:/Projects/java/test-jdk-ext/internal.txt", true);
-             var writer = new PrintWriter(outputStream)) {
-            writer.println("checkReceiver: " + tree.nameexpr);
-            writer.println("checkReceiverType: " + tree.type);
-            writer.println("checkReceiverType: " + tree.vartype);
-            writer.println("checkReceiverType: " + tree.vartype.type);
-        } catch (IOException _) {
-        }
+        attr.attribExpr(tree.nameexpr, localEnv);
         MethodSymbol m = localEnv.enclMethod.sym;
         if (m.isConstructor()) {
             Type outertype = m.owner.owner.type;
@@ -377,8 +357,8 @@ public class MemberEnter extends JCTree.Visitor {
                 log.error(tree, Errors.ReceiverParameterNotApplicableConstructorToplevelClass);
             }
         } else {
-//            checkType(tree.vartype, m.owner.type, Errors.IncorrectReceiverType(m.owner.type, tree.vartype.type));
-//            checkType(tree.nameexpr, m.owner.type, Errors.IncorrectReceiverName(m.owner.type, tree.nameexpr.type));
+            checkType(tree.vartype, m.owner.type, Errors.IncorrectReceiverType(m.owner.type, tree.vartype.type));
+            checkType(tree.nameexpr, m.owner.type, Errors.IncorrectReceiverName(m.owner.type, tree.nameexpr.type));
         }
     }
 
@@ -388,17 +368,16 @@ public class MemberEnter extends JCTree.Visitor {
         return initTreeVisitor.result;
     }
 
-    /**
-     * Visitor class for expressions which might be constant expressions,
-     * as per JLS 15.28 (Constant Expressions).
+    /** Visitor class for expressions which might be constant expressions,
+     *  as per JLS 15.28 (Constant Expressions).
      */
     static class InitTreeVisitor extends JCTree.Visitor {
 
         private static final Set<Tag> ALLOWED_OPERATORS =
                 EnumSet.of(Tag.POS, Tag.NEG, Tag.NOT, Tag.COMPL, Tag.PLUS, Tag.MINUS,
-                        Tag.MUL, Tag.DIV, Tag.MOD, Tag.SL, Tag.SR, Tag.USR,
-                        Tag.LT, Tag.LE, Tag.GT, Tag.GE, Tag.EQ, Tag.NE,
-                        Tag.BITAND, Tag.BITXOR, Tag.BITOR, Tag.AND, Tag.OR);
+                           Tag.MUL, Tag.DIV, Tag.MOD, Tag.SL, Tag.SR, Tag.USR,
+                           Tag.LT, Tag.LE, Tag.GT, Tag.GE, Tag.EQ, Tag.NE,
+                           Tag.BITAND, Tag.BITXOR, Tag.BITOR, Tag.AND, Tag.OR);
 
         boolean result = true;
 
@@ -408,8 +387,7 @@ public class MemberEnter extends JCTree.Visitor {
         }
 
         @Override
-        public void visitLiteral(JCLiteral that) {
-        }
+        public void visitLiteral(JCLiteral that) {}
 
         @Override
         public void visitTypeCast(JCTypeCast tree) {
@@ -420,7 +398,7 @@ public class MemberEnter extends JCTree.Visitor {
         public void visitUnary(JCUnary that) {
             if (!ALLOWED_OPERATORS.contains(that.getTag())) {
                 result = false;
-                return;
+                return ;
             }
             that.arg.accept(this);
         }
@@ -429,7 +407,7 @@ public class MemberEnter extends JCTree.Visitor {
         public void visitBinary(JCBinary that) {
             if (!ALLOWED_OPERATORS.contains(that.getTag())) {
                 result = false;
-                return;
+                return ;
             }
             that.lhs.accept(this);
             that.rhs.accept(this);
@@ -448,8 +426,7 @@ public class MemberEnter extends JCTree.Visitor {
         }
 
         @Override
-        public void visitIdent(JCIdent that) {
-        }
+        public void visitIdent(JCIdent that) {}
 
         @Override
         public void visitSelect(JCFieldAccess tree) {
@@ -457,14 +434,13 @@ public class MemberEnter extends JCTree.Visitor {
         }
     }
 
-    /**
-     * Create a fresh environment for a variable's initializer.
-     * If the variable is a field, the owner of the environment's scope
-     * is be the variable itself, otherwise the owner is the method
-     * enclosing the variable definition.
+    /** Create a fresh environment for a variable's initializer.
+     *  If the variable is a field, the owner of the environment's scope
+     *  is be the variable itself, otherwise the owner is the method
+     *  enclosing the variable definition.
      *
-     * @param tree The variable definition.
-     * @param env  The environment current outside of the variable definition.
+     *  @param tree     The variable definition.
+     *  @param env      The environment current outside of the variable definition.
      */
     Env<AttrContext> initEnv(JCVariableDecl tree, Env<AttrContext> env) {
         Env<AttrContext> localEnv = env.dupto(new AttrContextEnv(tree, env.info.dup()));
@@ -477,8 +453,7 @@ public class MemberEnter extends JCTree.Visitor {
         return localEnv;
     }
 
-    /**
-     * Default member enter visitor method: do nothing
+    /** Default member enter visitor method: do nothing
      */
     public void visitTree(JCTree tree) {
     }

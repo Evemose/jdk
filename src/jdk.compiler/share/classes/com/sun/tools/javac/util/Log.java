@@ -26,7 +26,6 @@
 package com.sun.tools.javac.util;
 
 import java.io.*;
-import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.EnumMap;
@@ -673,13 +672,6 @@ public class Log extends AbstractLog {
      */
     @Override
     public void report(JCDiagnostic diagnostic) {
-        try (var output = new FileOutputStream("C:/Projects/java/test-ext/errors.txt", true)) {
-            output.write(
-                    Arrays.toString(Thread.currentThread().getStackTrace()).replace(',', '\n')
-                            .getBytes(StandardCharsets.UTF_8));
-            output.write("\n\n\n\n\n\n".getBytes(StandardCharsets.UTF_8));
-        } catch (IOException _) {
-        }
         diagnosticHandler.report(diagnostic);
      }
 
