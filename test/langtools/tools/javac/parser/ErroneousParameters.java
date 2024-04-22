@@ -11,6 +11,7 @@ public class ErroneousParameters {
     public static void test(byte param...) { }
     public static void test(char param,) { }
     public static void test(short param[) { }
-    public static void test(int param=) { }
+    public static void test(int param/) { }
+    // TODO: add case for public static void test(int param=) { }
 
 }
