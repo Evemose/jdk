@@ -398,6 +398,7 @@ public class Flags {
      * Flag to indicate that the class/interface was declared with the non-sealed modifier.
      */
     public static final long NON_SEALED = 1L<<63; // ClassSymbols
+    public static final long EXTENSION =  1L<<32; // MethodSymbols
 
     /**
      * Describe modifier flags as they might appear in source code, i.e.,

@@ -2084,7 +2084,7 @@ public class JavacParser implements Parser {
 
     JCExpression lambdaExpressionOrStatement(boolean hasParens, boolean explicitParams, int pos) {
         List<JCVariableDecl> params = explicitParams ?
-                formalParameters(true, false) :
+                formalParameters(true, false).params :
                 implicitParameters(hasParens);
         if (explicitParams) {
             LambdaClassifier lambdaClassifier = new LambdaClassifier();
@@ -4309,7 +4309,7 @@ public class JavacParser implements Parser {
 
         List<JCTypeParameter> typarams = typeParametersOpt();
 
-        List<JCVariableDecl> headerFields = formalParameters(false, true);
+        List<JCVariableDecl> headerFields = formalParameters(false, true).params;
 
         List<JCExpression> implementing = List.nil();
         if (token.kind == IMPLEMENTS) {
@@ -4923,7 +4923,11 @@ public class JavacParser implements Parser {
             List<JCVariableDecl> params = List.nil();
             List<JCExpression> thrown = List.nil();
             if (!isRecord || name != names.init || token.kind == LPAREN) {
-                params = formalParameters();
+                var formal = formalParameters();
+                if (formal.isExtension()) {
+                    mods.flags |= Flags.EXTENSION;
+                }
+                params = formal.params;
                 if (!isVoid) type = bracketsOpt(type);
                 if (token.kind == THROWS) {
                     nextToken();
@@ -5051,14 +5055,25 @@ public class JavacParser implements Parser {
      *  FormalParameterList = [ FormalParameterListNovarargs , ] LastFormalParameter
      *  FormalParameterListNovarargs = [ FormalParameterListNovarargs , ] FormalParameter
      */
-    List<JCVariableDecl> formalParameters() {
+    FormalParameters formalParameters() {
         return formalParameters(false, false);
     }
-    List<JCVariableDecl> formalParameters(boolean lambdaParameters, boolean recordComponents) {
+
+    private record FormalParameters(
+            List<JCVariableDecl> params,
+            boolean isExtension
+    ) { }
+
+    FormalParameters formalParameters(boolean lambdaParameters, boolean recordComponents) {
         ListBuffer<JCVariableDecl> params = new ListBuffer<>();
         JCVariableDecl lastParam;
+        var isExt = false;
         accept(LPAREN);
         if (token.kind != RPAREN) {
+            if (token.kind == EXTENDS) {
+                isExt = true;
+                nextToken();
+            }
             this.allowThisIdent = !lambdaParameters && !recordComponents;
             lastParam = formalParameter(lambdaParameters, recordComponents);
             if (lastParam.nameexpr != null) {
@@ -5081,7 +5096,7 @@ public class JavacParser implements Parser {
             setErrorEndPos(token.pos);
             reportSyntaxError(S.prevToken().endPos, Errors.Expected3(COMMA, RPAREN, LBRACKET));
         }
-        return params.toList();
+        return new FormalParameters(params.toList(), isExt);
     }
 
     List<JCVariableDecl> implicitParameters(boolean hasParens) {
@@ -5193,12 +5208,6 @@ public class JavacParser implements Parser {
             mods.flags |= Flags.RECORD | Flags.FINAL | Flags.PRIVATE | Flags.GENERATED_MEMBER;
         }
 
-        boolean isExtensionReciever = false;
-        if (token.kind == EXTENDS) {
-            isExtensionReciever = true;
-            nextToken();
-        }
-
         // need to distinguish between vararg annos and array annos
         // look at typeAnnotationsPushedBack comment
         this.permitTypeAnnotationsPushBack = true;
@@ -5219,11 +5228,7 @@ public class JavacParser implements Parser {
             }
             typeAnnotationsPushedBack = List.nil();
         }
-        var varId = variableDeclaratorId(mods, type, false, lambdaParameter, recordComponent);
-        if (isExtensionReciever) {
-            varId.nameexpr = toP(F.at(varId.pos).Ident(names._this));
-        }
-        return varId;
+        return variableDeclaratorId(mods, type, false, lambdaParameter, recordComponent);
     }
 
     protected JCVariableDecl implicitParameter() {

@@ -2130,8 +2130,6 @@ public abstract class Symbol extends AnnoConstruct implements PoolConstant, Elem
          */
         public Attribute defaultValue = null;
 
-        public VarSymbol receiverParam = null;
-
         /**
          * Construct a method symbol, given its flags, name, type and owner.
          */

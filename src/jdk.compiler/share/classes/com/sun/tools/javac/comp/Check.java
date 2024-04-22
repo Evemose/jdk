@@ -40,6 +40,7 @@ import javax.lang.model.element.NestingKind;
 import javax.tools.JavaFileManager;
 
 import com.sun.source.tree.CaseTree;
+import com.sun.source.util.Trees;
 import com.sun.tools.javac.code.*;
 import com.sun.tools.javac.code.Attribute.Compound;
 import com.sun.tools.javac.code.Directive.ExportsDirective;

@@ -1606,6 +1606,13 @@ public class JavaCompiler {
                 return;
             }
 
+            if (shouldStop(CompileState.TRANSEXTENSIONS))
+                return;
+
+            env.tree = TransExtensions.instance(context).translateTopLevelClass(env, env.tree, localMake, context);
+
+            compileStates.put(env, CompileState.TRANSEXTENSIONS);
+
             if (shouldStop(CompileState.TRANSTYPES))
                 return;
 
@@ -1626,6 +1633,7 @@ public class JavaCompiler {
             }
 
             compileStates.put(env, CompileState.TRANSPATTERNS);
+
 
             if (scanner.hasLambdas) {
                 if (shouldStop(CompileState.UNLAMBDA))

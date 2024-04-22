@@ -25,14 +25,6 @@
 
 package com.sun.tools.javac.comp;
 
-import java.util.*;
-import java.util.function.BiConsumer;
-import java.util.function.Consumer;
-import java.util.stream.Stream;
-
-import javax.lang.model.element.ElementKind;
-import javax.tools.JavaFileObject;
-
 import com.sun.source.tree.CaseTree;
 import com.sun.source.tree.IdentifierTree;
 import com.sun.source.tree.MemberReferenceTree.ReferenceMode;
@@ -50,35 +42,37 @@ import com.sun.tools.javac.comp.ArgumentAttr.LocalCacheContext;
 import com.sun.tools.javac.comp.Check.CheckContext;
 import com.sun.tools.javac.comp.DeferredAttr.AttrMode;
 import com.sun.tools.javac.comp.MatchBindingsComputer.MatchBindings;
-import com.sun.tools.javac.jvm.*;
-
-import static com.sun.tools.javac.resources.CompilerProperties.Fragments.Diamond;
-import static com.sun.tools.javac.resources.CompilerProperties.Fragments.DiamondInvalidArg;
-import static com.sun.tools.javac.resources.CompilerProperties.Fragments.DiamondInvalidArgs;
-
+import com.sun.tools.javac.jvm.ByteCodes;
+import com.sun.tools.javac.jvm.Target;
 import com.sun.tools.javac.resources.CompilerProperties.Errors;
 import com.sun.tools.javac.resources.CompilerProperties.Fragments;
 import com.sun.tools.javac.resources.CompilerProperties.Warnings;
 import com.sun.tools.javac.tree.*;
 import com.sun.tools.javac.tree.JCTree.*;
-import com.sun.tools.javac.tree.JCTree.JCPolyExpression.*;
+import com.sun.tools.javac.tree.JCTree.JCPolyExpression.PolyKind;
 import com.sun.tools.javac.util.*;
 import com.sun.tools.javac.util.DefinedBy.Api;
-import com.sun.tools.javac.util.JCDiagnostic.DiagnosticPosition;
 import com.sun.tools.javac.util.JCDiagnostic.Error;
-import com.sun.tools.javac.util.JCDiagnostic.Fragment;
-import com.sun.tools.javac.util.JCDiagnostic.Warning;
 import com.sun.tools.javac.util.List;
+import com.sun.tools.javac.util.JCDiagnostic.*;
 
-import static com.sun.tools.javac.code.Flags.*;
+import javax.lang.model.element.ElementKind;
+import javax.tools.JavaFileObject;
+import java.util.*;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
+import java.util.stream.Stream;
+
 import static com.sun.tools.javac.code.Flags.ANNOTATION;
 import static com.sun.tools.javac.code.Flags.BLOCK;
-import static com.sun.tools.javac.code.Kinds.*;
+import static com.sun.tools.javac.code.Flags.*;
+import static com.sun.tools.javac.code.Kinds.Kind;
 import static com.sun.tools.javac.code.Kinds.Kind.*;
-import static com.sun.tools.javac.code.TypeTag.*;
+import static com.sun.tools.javac.code.Kinds.*;
 import static com.sun.tools.javac.code.TypeTag.WILDCARD;
+import static com.sun.tools.javac.code.TypeTag.*;
+import static com.sun.tools.javac.resources.CompilerProperties.Fragments.*;
 import static com.sun.tools.javac.tree.JCTree.Tag.*;
-import com.sun.tools.javac.util.JCDiagnostic.DiagnosticFlag;
 
 /** This is the main context-dependent analysis phase in GJC. It
  *  encompasses name resolution, type checking and constant folding as
@@ -4871,9 +4865,33 @@ public class Attr extends JCTree.Visitor {
                             final Symbol sym,
                             ResultInfo resultInfo,
                             Env<AttrContext> env,
-                            final List<JCExpression> argtrees,
+                            List<JCExpression> argtrees,
                             List<Type> argtypes,
                             List<Type> typeargtypes) {
+        var isExt = false;
+        // if method is extension, for period of checks we should provide argtypes with the site type
+        // and args with invoking three, as it will be after desugaring
+        if ((sym.flags_field & EXTENSION) != 0 && !sym.owner.type.equals(site)) {
+            if (argtrees == null) {
+                argtrees = List.nil();
+            }
+            if (env.tree instanceof JCMethodInvocation invocation) {
+                if (invocation.meth instanceof JCFieldAccess fieldAccess) {
+                    argtrees = argtrees.prepend(fieldAccess.selected);
+                    argtypes = argtypes.prepend(site);
+                    isExt = true;
+                } else if (invocation.meth instanceof JCIdent
+                        && site.equals(env.enclClass.type)
+                        && !(env.enclMethod != null ? env.enclMethod.sym.isStatic() : env.enclClass.sym.isStatic())) {
+                    var thiz = make.Ident(names._this);
+                    thiz.type = site;
+                    thiz.sym = env.enclClass.sym;
+                    argtrees = argtrees.prepend(thiz);
+                    argtypes = argtypes.prepend(site);
+                    isExt = true;
+                }
+            }
+        }
         // Test (5): if symbol is an instance method of a raw type, issue
         // an unchecked warning if its argument types change under erasure.
         if ((sym.flags() & STATIC) == 0 &&
@@ -4955,10 +4973,22 @@ public class Attr extends JCTree.Visitor {
                  PolyKind.POLY : PolyKind.STANDALONE;
             TreeInfo.setPolyKind(env.tree, pkind);
 
-            return (resultInfo.pt == Infer.anyPoly) ?
+            var finalType = (Type.MethodType) ((resultInfo.pt == Infer.anyPoly) ?
                     owntype :
-                    chk.checkMethod(owntype, sym, env, argtrees, argtypes, env.info.lastResolveVarargs(),
-                            resultInfo.checkContext.inferenceContext());
+                    chk.checkMethod(owntype, sym, env,
+                            argtrees,
+                            argtypes,
+                            env.info.lastResolveVarargs(),
+                            resultInfo.checkContext.inferenceContext()));
+            if (isExt) {
+                // type of extension method invocation should be detached from invoked symbol type
+                finalType = new MethodType(
+                        finalType.getParameterTypes().tail,
+                        finalType.getReturnType(),
+                        finalType.getThrownTypes(),
+                        finalType.tsym);
+            }
+            return finalType;
         } catch (Infer.InferenceException ex) {
             //invalid target type - propagate exception outwards or report error
             //depending on the current check context

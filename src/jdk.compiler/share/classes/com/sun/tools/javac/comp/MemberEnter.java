@@ -238,11 +238,6 @@ public class MemberEnter extends JCTree.Visitor {
         }
         m.params = params.toList();
 
-        // Set m.receiverParam if present
-        if (tree.recvparam != null) {
-            m.receiverParam = Assert.checkNonNull(tree.recvparam.sym);
-        }
-
         // mark the method varargs, if necessary
         if (lastParam != null && (lastParam.mods.flags & Flags.VARARGS) != 0)
             m.flags_field |= Flags.VARARGS;
