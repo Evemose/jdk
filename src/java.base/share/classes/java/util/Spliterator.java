@@ -24,10 +24,7 @@
  */
 package java.util;
 
-import java.util.function.Consumer;
-import java.util.function.DoubleConsumer;
-import java.util.function.IntConsumer;
-import java.util.function.LongConsumer;
+import java.util.function.*;
 
 /**
  * An object for traversing and partitioning elements of a source.  The source

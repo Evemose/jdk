@@ -35,11 +35,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.Semaphore;
-import java.util.function.BiConsumer;
-import java.util.function.BiFunction;
-import java.util.function.BinaryOperator;
-import java.util.function.Function;
-import java.util.function.Supplier;
+import java.util.function.*;
 import java.util.stream.Gatherer.Integrator;
 import java.util.stream.Gatherer.Downstream;
 
@@ -703,5 +699,159 @@ public final class Gatherers {
                 );
             }
         }
+    }
+
+    /**
+     * Returns a Gatherer that performs filtering based on the index of the
+     * element and the element itself.
+     * The index is incremented for each element that is processed.
+     * @param filter the predicate to test the index and element
+     * @return a new Gatherer
+     * @param <T> the type of elements the returned gatherer consumes
+     */
+    @SuppressWarnings("unchecked")
+    public static <T> Gatherer<T, ?, T> filterEnumerated(BiPredicate<Long, T> filter) {
+        Objects.requireNonNull(filter, "'filter' must not be null");
+        class State {
+            long index = 0;
+            boolean integrate(T element, Downstream<? super T> downstream) {
+                if (filter.test(index++, element)) {
+                    return downstream.push(element);
+                }
+                return true;
+            }
+        }
+        return Gatherer.ofSequential(
+                State::new,
+                Integrator.<State, T, T>ofGreedy(State::integrate)
+        );
+    }
+
+    /**
+     * Returns a Gatherer that performs mapping based on the index of the
+     * element and the element itself.
+     * The index is incremented for each element that is processed.
+     * @param mapper the function to apply to the index and element
+     * @return a new Gatherer
+     * @param <T> the type of elements the returned gatherer consumes
+     * @param <R> the type of elements the returned gatherer produces
+     */
+    public static <T, R> Gatherer<T, ?, R> mapEnumerated(BiFunction<Long, T, R> mapper) {
+        Objects.requireNonNull(mapper, "'mapper' must not be null");
+        class State {
+            long index = 0;
+            boolean integrate(T element, Downstream<? super R> downstream) {
+                return downstream.push(mapper.apply((Long) index++, element));
+            }
+        }
+        return Gatherer.ofSequential(
+                State::new,
+                Integrator.<State, T, R>ofGreedy(State::integrate)
+        );
+    }
+
+    /**
+     * Returns a Gatherer that performs flat-mapping based on the index of the
+     * element and the element itself.
+     * The index is incremented for each element that is processed.
+     * @param mapper the function to apply to the index and element
+     * @return a new Gatherer
+     * @param <T> the type of elements the returned gatherer consumes
+     * @param <R> the type of elements the returned gatherer produces
+     */
+    public static <T, R> Gatherer<T, ?, R> flatMapEnumerated(BiFunction<Long, T, Stream<R>> mapper) {
+        Objects.requireNonNull(mapper, "'mapper' must not be null");
+        class State {
+            long index = 0;
+            boolean integrate(T element, Downstream<? super R> downstream) {
+                for (R r : mapper.apply((Long) index++, element).toList()) {
+                    if (!downstream.push(r)) {
+                        return false;
+                    }
+                }
+                return true;
+            }
+        }
+        return Gatherer.ofSequential(
+                State::new,
+                Integrator.<State, T, R>ofGreedy(State::integrate)
+        );
+    }
+
+    /**
+     * Returns a Gatherer that performs a peek operation based on the index of the
+     * element and the element itself.
+     * The index is incremented for each element that is processed.
+     * @param action the action to perform on the index and element
+     * @return a new Gatherer
+     * @param <T> the type of elements the returned gatherer consumes
+     */
+    public static <T> Gatherer<T, ?, T> peekEnumerated(BiConsumer<Long, T> action) {
+        Objects.requireNonNull(action, "'action' must not be null");
+        class State {
+            long index = 0;
+            boolean integrate(T element, Downstream<? super T> downstream) {
+                action.accept((Long) index++, element);
+                return downstream.push(element);
+            }
+        }
+        return Gatherer.ofSequential(
+                State::new,
+                Integrator.<State, T, T>ofGreedy(State::integrate)
+        );
+    }
+
+    /**
+     * Returns a Gatherer that performs a takeWhile operation based on the index of the
+     * element and the element itself.
+     * The index is incremented for each element that is processed.
+     * @param predicate the predicate to test the index and element
+     * @return a new Gatherer
+     * @param <T> the type of elements the returned gatherer consumes
+     */
+    public static <T> Gatherer<T, ?, T> takeWhileEnumerated(BiPredicate<Long, T> predicate) {
+        Objects.requireNonNull(predicate, "'predicate' must not be null");
+        class State {
+            long index = 0;
+            boolean integrate(T element, Downstream<? super T> downstream) {
+                if (predicate.test((Long) index++, element)) {
+                    return downstream.push(element);
+                }
+                return false;
+            }
+        }
+        return Gatherer.ofSequential(
+                State::new,
+                Integrator.<State, T, T>ofGreedy(State::integrate)
+        );
+    }
+
+    /**
+     * Returns a Gatherer that performs a dropWhile operation based on the index of the
+     * element and the element itself.
+     * The index is incremented for each element that is processed.
+     * @param predicate the predicate to test the index and element
+     * @return a new Gatherer
+     * @param <T> the type of elements the returned gatherer consumes
+     */
+    public static <T> Gatherer<T, ?, T> dropWhileEnumerated(BiPredicate<Long, T> predicate) {
+        Objects.requireNonNull(predicate, "'predicate' must not be null");
+        class State {
+            long index = 0;
+            boolean dropping = true;
+            boolean integrate(T element, Downstream<? super T> downstream) {
+                if (dropping) {
+                    if (predicate.test((Long) index++, element)) {
+                        return true;
+                    }
+                    dropping = false;
+                }
+                return downstream.push(element);
+            }
+        }
+        return Gatherer.ofSequential(
+                State::new,
+                Integrator.<State, T, T>ofGreedy(State::integrate)
+        );
     }
 }

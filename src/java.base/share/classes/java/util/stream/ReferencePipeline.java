@@ -267,6 +267,24 @@ abstract class ReferencePipeline<P_IN, P_OUT>
         };
     }
 
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public EnumeratedStream<P_OUT> enumerate() {
+        return new EnumeratedPipeline<>(this, StreamOpFlag.NOT_ORDERED) {
+            @Override
+            boolean opIsStateful() {
+                return false;
+            }
+
+            @Override
+            Sink<P_OUT> opWrapSink(int flags, Sink<P_OUT> sink) {
+                return sink;
+            }
+        };
+    }
+
     @Override
     public final <R> Stream<R> flatMap(Function<? super P_OUT, ? extends Stream<? extends R>> mapper) {
         Objects.requireNonNull(mapper);

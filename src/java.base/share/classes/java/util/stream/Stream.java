@@ -834,6 +834,21 @@ public interface Stream<T> extends BaseStream<T, Stream<T>> {
     }
 
     /**
+     * Returns an EnumeratedStream consisting of the elements of this stream, each
+     * element is associated with an index.
+     * @return an EnumeratedStream
+     */
+    // for now, default impl is EXTREMELY inefficient, because it needs to
+    // collect all elements into an array first. This is a temporary
+    // solution until I have a better way to implement this.
+    // Would appreciate any help on this.
+    // FIXME implement a more efficient way to enumerate a stream
+    @SuppressWarnings("unchecked")
+    default EnumeratedStream<T> enumerate() {
+        return (EnumeratedStream<T>) EnumeratedStream.of(toArray());
+    }
+
+    /**
      * Performs an action for each element of this stream.
      *
      * <p>This is a <a href="package-summary.html#StreamOps">terminal
